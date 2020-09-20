@@ -85,6 +85,8 @@ If we are satisfied with the results of the simulation, we can have xeda synthes
 
 That's it! That's all xeda requires to simulate, synthesis, and implement an HDL design.
 
+As always, you can run ``xeda --help`` or ``xeda run --help`` for the full list of arguments.
+
 Output
 --------
 
@@ -95,4 +97,5 @@ information on whether the run succeeded or failed.
 The default output location is ``<working_dir>/xeda_runs/<DFH>/``, and can be
 changed with the ``--xeda-run-dir`` flag.
 
-As always, you can run ``xeda --help`` or ``xeda run --help`` for the full list of arguments
+Xeda also facilitates post-run plugins. This can be used to automate report
+generation, analysis, and more. For information, checkout the :ref:`plugin` page.
