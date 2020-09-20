@@ -1,6 +1,14 @@
 Quickstart
 ==========
 
+Xeda uses the following vocabulary throughout its documentation:
+
+* Tool: Single executable that performs an EDA action.
+* Suite: A collection of Tools.
+* Flow: Execution of chain of tools from one or several suites.
+* Flow dependencies: Dependencies are managed by the use of design-flow hash (DFH). DFH is a combined cryptographic hash of the content of dependency files (e.g. HDL sources) as well as design and flow settings. The directory where the flow is run and the results are created is based on this design design-flow hash.
+
+
 To get started with xeda, first create a ``design.json`` file for your design.
 This file contains metadata, list of source files, and flow settings regarding
 your design. Below is an example ``design.json`` which can be adapted to any design. 
@@ -76,5 +84,15 @@ If we are satisfied with the results of the simulation, we can have xeda synthes
     $ xeda run vivado_synth
 
 That's it! That's all xeda requires to simulate, synthesis, and implement an HDL design.
+
+Output
+--------
+
+Output from Xeda runs are stored in directories tagged by the run's DFH. The
+``settings.json`` file provides a quick summary of the flow settings and
+information on whether the run succeeded or failed.
+
+The default output location is ``<working_dir>/xeda_runs/<DFH>/``, and can be
+changed with the ``--xeda-run-dir`` flag.
 
 As always, you can run ``xeda --help`` or ``xeda run --help`` for the full list of arguments
