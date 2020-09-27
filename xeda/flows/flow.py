@@ -20,10 +20,8 @@ from ..utils import camelcase_to_snakecase, try_convert
 from ..debug import DebugLevel
 
 from pathlib import Path
-
 from typing import Union, Dict, List
 import hashlib
-
 JsonType = Union[str, int, float, bool, List['JsonType'], 'JsonTree']
 JsonTree = Dict[str, JsonType]
 StrTreeType = Union[str, List['StrTreeType'], 'StrTree']
@@ -53,7 +51,7 @@ class Flow():
 
         self.args = args
         self.run_hash = None
-
+        
         if not isinstance(settings.design['sources'], list):
             self.fatal('`sources` section of the settings needs to be a list')
 
@@ -88,7 +86,6 @@ class Flow():
         self.no_console = args.debug >= DebugLevel.LOW
 
         self.init_time = time.monotonic()
-
         self.post_run_hooks = []
         self.post_results_hooks = []
 

@@ -10,7 +10,7 @@ import pkg_resources
 
 from .debug import DebugLevel
 from .flow_runner import DefaultFlowRunner, LwcFmaxRunner, LwcVariantsRunner
-
+from .plugins import PluginBase, IRunner
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -28,7 +28,7 @@ class XedaApp:
             prog=__package__,
             description=f'{__package__}: Cross-EDA abstraction and automation. Version: {__version__}')
         self.args = None
-
+        PluginBase.init()
         # TODO this should be dynamically setup during runner registeration
         self.registered_runner_cmds = {
             'run': DefaultFlowRunner,
@@ -65,16 +65,24 @@ class XedaApp:
             logger.addHandler(fileHandler)
 
             coloredlogs.install('INFO', fmt='%(asctime)s %(levelname)s %(message)s', logger=logger)
-
-            runner = runner_cls(self.args, timestamp)
+            if not args.command == 'dumdum': # TODO remove
+                runner = runner_cls(self.args, timestamp)
         else:
             sys.exit(f"Runner for {args.command} is not implemented")
-
-        runner.launch()
+        if not args.command == 'dumdum':
+            runner.launch(args)
+        else:
+            self.registered_runner_cmds[args.command].launch(args)
 
     # TODO FIXME
 
     def register_plugin_parsers(self):
+        # new
+        for plugin in PluginBase.registry:
+            if isinstance(plugin, IRunner):
+                self.registered_runner_cmds[plugin.command] = plugin #probably dont need this dict anymore
+                plugin.register_subparser(self.subparsers)
+        # old
         # TODO FIXME
         for runner_plugin in self.registered_runner_cmds.values():
             runner_plugin.register_subparser(self.subparsers)

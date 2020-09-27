@@ -11,6 +11,8 @@ Welcome to XEDA's documentation!
    :caption: Contents:
 
 
+To get started, checkout the :ref:`quickstart` page.
+
 
 Indices and tables
 ==================

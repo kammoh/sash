@@ -251,6 +251,8 @@ class FlowRunner():
 
 
 class DefaultFlowRunner(FlowRunner):
+    # This is really weird - cls typically refers to static methods, but here the 
+    # @classmethod decorator is used?
     @classmethod
     def register_subparser(cls, subparsers):
         run_parser = subparsers.add_parser('run', help='Run a flow')
