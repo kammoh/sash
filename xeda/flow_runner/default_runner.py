@@ -8,6 +8,7 @@ import json
 from ..flows.settings import Settings
 from ..flows.flow import Flow, FlowFatalException, my_print
 from ..utils import camelcase_to_snakecase, load_class, dict_merge, try_convert
+from .. import xeda_app
 
 logger = logging.getLogger()
 
@@ -144,7 +145,7 @@ class FlowRunner:
         settings['flows'][self.args.flow] = merge_overrides(
             self.args.override_flow_settings, flow_settings)
 
-        settings['design']['xeda_version'] = self.xeda_project['xeda_version']
+        settings['design']['xeda_version'] = xeda_app.__version__
 
         return self.validate_settings(settings)
 

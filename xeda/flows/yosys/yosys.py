@@ -1,5 +1,6 @@
 
 import logging
+from types import SimpleNamespace
 import pkg_resources
 from ..flow import DesignSource, SimFlow, Flow, SynthFlow
 import toml
@@ -53,6 +54,7 @@ class FPGA:
                 self.package = package
                 self.grade = spg[-1]
 
+
 def get_board_data(board):
     board_toml = pkg_resources.resource_string(
         'xeda.data.boards.' + board, 'board.toml')
@@ -61,31 +63,34 @@ def get_board_data(board):
     return toml.loads(board_toml)
 
 
-
-
 class Yosys(SynthFlow):
+    required_settings = {}
+
     def run(self):
         flow_settings = self.settings.flow
 
         fpga = flow_settings.get('fpga')
-        if not isinstance(fpga, FPGA):
+        if fpga and not isinstance(fpga, FPGA):
             fpga = FPGA(fpga)
 
-        synth_opts = [
-            '-abc9',
-            # 'nowidelut'
-            #  '-dff'
-            # '-abc2', '-retime'
-        ]
+        opts = SimpleNamespace(
+            synth=[],
+            rtl_check=[]  # '-noinit'
+        )
 
-        rtl_check_flags = [] #'-noinit'
+        if fpga:
+            if fpga.family == 'ecp5':
+                opts.synth.extend(['-abc9'
+                                   # 'nowidelut'
+                                   #  '-dff'
+                                   # '-abc2', '-retime'
+                                   ])
+
+        # '-noinit'
 
         script_path = self.copy_from_template(
-            f'yosys.ys', fpga=fpga, 
-            rtl_check_flags=" ".join(rtl_check_flags),
-            synth_opts=" ".join(synth_opts))
-        self.run_process(
-            'yosys', ['-q', '-l', 'yosys.log', script_path])
+            'yosys.ys', synth_command=f'synth_{fpga.family}' if fpga else 'synth', opts=opts)
+        self.run_process('yosys', ['-q', '-l', 'yosys.log', script_path])
 
         self.results['success'] = True
 
@@ -167,7 +172,7 @@ class OpenFpgaLoader(SynthFlow):
 
         packer = None
 
-        if fpga.family == 'ecp5': # FIXME from fpga/board
+        if fpga.family == 'ecp5':  # FIXME from fpga/board
             packer = 'ecppack'
 
         if packer:
@@ -200,6 +205,3 @@ class OpenFpgaLoader(SynthFlow):
 #         self.results['generated_design'] = {'rtl': {'top': 'board_top', 'sources': [self.flow_run_dir / pll_verilog_filename] }}
 
 #         self.results['success'] = True
-
-
-

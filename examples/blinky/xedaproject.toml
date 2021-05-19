@@ -6,6 +6,8 @@ description = 'Running LEDs on the ULX3S board'
 sources = ['blinky.v']
 top = 'top'
 
+
+
 [flows.open_fpga_loader]
 board = 'ulx3s'
 clock_period = 20 # 50 MHz

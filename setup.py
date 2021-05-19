@@ -4,7 +4,7 @@ from setuptools.command.develop import develop
 
 
 def _post_install(dir):
-    from xeda.xeda_app import gen_shell_completion
+    from xeda.cli import gen_shell_completion
     gen_shell_completion()
 
 
@@ -101,7 +101,7 @@ Xeda can assists hardware developers during verification, evaluation, and deploy
     # pip to create the appropriate form of executable for the target platform.
     entry_points={
         'console_scripts': [
-            'xeda=xeda:cli.run_xeda',
+            'xeda=xeda:cli.main',
         ],
     },
     cmdclass=dict(install=InstallWrapper, develop=DevelopWrapper),
