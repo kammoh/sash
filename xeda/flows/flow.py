@@ -79,15 +79,20 @@ class MetaFlow(ABCMeta):
 registered_flows: Dict[str, Tuple[str, Type[Flow]]] = {}
 
 
-""" A flow may run one or more tools and is associated with a single set of settings and a single design. """
+class ToolInfo(BaseModel):
+    version: NoneStr = None
+    path: NoneStr = None
+    dockerized: bool = False
+    remote_host: NoneStr = None
 
 
 class Flow(metaclass=MetaFlow):
-    """name attribute is set automatically"""
+    """ A flow may run one or more tools and is associated with a single set of settings and a single design. """
     name = None
+    """name attribute is set automatically"""
 
-    """Settings that can affect flow's behavior"""
     class Settings(BaseModel, metaclass=ABCMeta, extra=Extra.forbid):
+        """Settings that can affect flow's behavior"""
         reports_subdir_name: str = 'reports'
         timeout_seconds: int = 3600 * 2
         """max number of threads/cpus"""
@@ -443,10 +448,11 @@ class SimFlow(Flow):
 
 
 class FPGA(BaseModel):
-    part: str
+    part: NoneStr = None
     vendor: NoneStr = None
+    device: NoneStr = None
     family: NoneStr = None
-    speed_grade: NoneStr = None
+    speed: NoneStr = None
     package: NoneStr = None
 
     def __init__(self, **data) -> None:

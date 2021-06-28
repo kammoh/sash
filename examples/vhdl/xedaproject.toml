@@ -22,3 +22,9 @@ clock_period = 0.0
 fpga.part = 'xc7a12tcsg325-1'
 clock_period = 0.0
 
+[flows.ise_synth]
+fpga.family = "virtex5"
+fpga.device = "XC5VLX50"
+fpga.speed = -1
+fpga.package = "FFG676C"
+
