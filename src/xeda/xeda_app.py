@@ -1,4 +1,7 @@
 # © 2020 [Kamyar Mohajerani](mailto:kamyar@ieee.org)
+"""
+Xeda application
+"""
 
 import inspect
 import multiprocessing
@@ -6,26 +9,22 @@ import os
 from pathlib import Path
 import sys
 import argparse
-from .flows.flow import Flow, SimFlow, SynthFlow
-from .utils import camelcase_to_snakecase, load_class
 import logging
-import pkg_resources
-
-from .debug import DebugLevel
-from .flow_runner import FlowRunner
-from .flow_runner.default_runner import DefaultRunner
 import toml
 import json
 import shtab
+from .flows.flow import Flow, SimFlow, SynthFlow
+from .utils import camelcase_to_snakecase, load_class
+from .debug import DebugLevel
+from .flow_runner import FlowRunner
+from .flow_runner.default_runner import DefaultRunner
+
+from ._version import get_versions
+__version__ = get_versions()['version']
+del get_versions
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-
-
-try:
-    __version__ = pkg_resources.get_distribution(__package__).version
-except pkg_resources.DistributionNotFound:
-    __version__ = '(N/A - Local package)'
 
 
 class ListDesignsAction(argparse.Action):
@@ -165,15 +164,15 @@ def get_main_argparser():
         default='xedaproject.toml',
         help='Path to Xeda project file. By default will use xedaproject.toml in the current directory.'
     )
-    parser.add_argument('--override-settings', nargs='+',
-                        help=('Override setting value. Use <hierarchy>.key=value format'
-                              'example: --override-settings flows.vivado_run.stop_time=100us'
-                              )
-                        )
-    parser.add_argument('--override-flow-settings', nargs='+',
+    # parser.add_argument('--override-settings', nargs='+',
+    #                     help=('Override setting value. Use <hierarchy>.key=value format'
+    #                           'example: --override-settings flows.vivado_run.stop_time=100us'
+    #                           )
+    #                     )
+    parser.add_argument('--flow-settings', nargs='+',
                         help=(
-                            'Override setting values for the specified main flow. Use <hierarchy>.key=value format'
-                            'example: xeda vivado_sim --override-settings stop_time=100us')
+                            'Override setting values for the main flow. Use key=value format.'
+                            'example: xeda vivado_sim --flow-settings stop_time=100us')
                         )
     parser.add_argument(
         '--version',  action='version', version=f'%(prog)s {__version__}', help='Print version information and exit',
@@ -228,6 +227,7 @@ def sanitize_toml(obj):
             f"ERROR in xeda_app.sanitize_toml: unhandled object of type {type(obj)}: {obj}")
         return sanitize_toml(dict(obj))
 
+
 def load_xedaproject(project_file: Path):
     try:
         with open(project_file) as f:
@@ -237,12 +237,14 @@ def load_xedaproject(project_file: Path):
             elif ext == '.toml':
                 return sanitize_toml(toml.load(f))
             else:
-                exit(f"xedaproject: {project_file} has unknown extension {ext}. Currently supported formats are TOML (.toml) and JSON (.json)")
+                exit(
+                    f"xedaproject: {project_file} has unknown extension {ext}. Currently supported formats are TOML (.toml) and JSON (.json)")
     except FileNotFoundError:
         exit(
             f'Cannot open project file: {project_file}. Please run from the project directory with xedaproject.toml or specify the correct path using the --xedaproject flag')
     except IsADirectoryError:
         exit(f'The specified xedaproject is not a regular file.')
+
 
 class XedaApp:
     def main(self, args=None):
@@ -255,8 +257,6 @@ class XedaApp:
 
         toml_path = Path(parsed_args.xedaproject)
         xeda_project = load_xedaproject(toml_path)
-
-        xeda_project['xeda_version'] = __version__
 
         runner: FlowRunner = runner_cls(parsed_args, xeda_project)
 

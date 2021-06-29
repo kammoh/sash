@@ -1,26 +1,32 @@
 from datetime import datetime
 import coloredlogs
 import os
+import time
+import json
 import logging
 from types import SimpleNamespace
 from typing import Any, Dict, List, Sequence
 from pathlib import Path
 from datetime import datetime
 import logging
-
 from pydantic.error_wrappers import ValidationError, display_errors
-
 from ..flows.flow_gen import FlowGen
 from ..flows.design import Design, DesignError
 from ..flows.flow import Flow
+from ..utils import dump_json
 
 logger = logging.getLogger()
 
 
-
 class FlowRunner:
     def __init__(self, args: SimpleNamespace, xeda_project: Dict[str, Any]) -> None:
-        self.consolidate_settings(args, xeda_project)
+        self.args: SimpleNamespace = args
+
+        self.flows = xeda_project.get('flows', {})
+        designs = xeda_project['design']
+        if not isinstance(designs, Sequence):
+            designs = [designs]
+        self.designs = designs
 
         self.selected_design = args.design
 
@@ -85,22 +91,6 @@ class FlowRunner:
 
         return {}
 
-    def consolidate_settings(self, args: SimpleNamespace, xeda_project: Dict[str, Any]):
-        # settings = dict_merge(settings, design_settings)
-
-        # settings = merge_overrides(args.override_settings, settings)
-        # flow_settings = settings['flows'].get(args.flow, dict())
-        # settings['flows'][args.flow] = merge_overrides(
-        #     args.override_flow_settings, flow_settings)
-
-        # settings['design']['xeda_version'] = xeda_project['xeda_version']
-        designs = xeda_project['design']
-        if not isinstance(designs, Sequence):
-            designs = [designs]
-        self.designs = designs
-        self.flows = xeda_project.get('flows', {})
-
-
     def launch(self, flow_name: str, force_run: bool) -> List[Flow]:
         """
         runs the flow and returns the completed flow object
@@ -119,15 +109,30 @@ class FlowRunner:
             design: Design = Design(**design_settings)
         except ValidationError as e:
             errors = e.errors()
-            raise DesignError(f"{len(errors)} errors while parsing `design` settings:\n\n{display_errors(errors)}\n") from None
+            raise DesignError(
+                f"{len(errors)} errors while parsing `design` settings:\n\n{display_errors(errors)}\n") from None
 
         completed_dependencies: List[Flow] = []
 
         flow: Flow = flow_gen.generate(
-            flow_name, "xeda.flows", design, self.xeda_run_dir, completed_dependencies=completed_dependencies)
+            flow_name, "xeda.flows", design, self.xeda_run_dir,  completed_dependencies=completed_dependencies, override_settings=self.args.flow_settings, verbose=self.args.verbose
+        )
+
         flow.run()
+
+        if flow.init_time is not None:
+            flow.results['runtime_minutes'] = (
+                time.monotonic() - flow.init_time) / 60
+
         flow.parse_reports()
-        flow.dump_results()
+
+        flow.results['design'] = flow.design.name
+        flow.results['flow'] = flow.name
+
+        path = flow.run_path / f'results.json'
+        dump_json(flow.results, path)
+        logger.info(f"Results written to {path}")
+
         flow.print_results()
 
         completed_dependencies.append(flow)

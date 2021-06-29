@@ -16,11 +16,14 @@ class VivadoPrjSynth(VivadoSynth, SynthFlow):
         # checkpoints_dir = 'checkpoints'
 
         synth: RunOptions = RunOptions(
+            strategy="Flow_PerfOptimized_high",
             steps={
                 'SYNTH_DESIGN': {}, 'OPT_DESIGN': {}, 'POWER_OPT_DESIGN': {},
-            })
+            }
+        )
 
         impl: RunOptions = RunOptions(
+            strategy="Performance_ExploreWithRemap",
             steps={
                 'PLACE_DESIGN': {}, 'POST_PLACE_POWER_OPT_DESIGN': {},
                 'PHYS_OPT_DESIGN': {}, 'ROUTE_DESIGN': {}, 'WRITE_BITSTREAM': {}

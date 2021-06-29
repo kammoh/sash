@@ -102,7 +102,7 @@ class Flow(metaclass=MetaFlow):
         no_console: bool = False
         reports_dir: str = 'reports'
         lib_paths: List[str] = []
-        generics: Dict[str, str] = {}
+        defines: Dict[str, str] = Field({}, alias='generics')
 
     @classmethod
     def prerequisite_flows(cls, flow_settings, design_settings):
@@ -128,6 +128,7 @@ class Flow(metaclass=MetaFlow):
         self.run_path = run_path
 
         self.init_time = None
+        self.timestamp = None
 
         self.reports_dir = run_path / self.settings.reports_subdir_name
         self.reports_dir.mkdir(exist_ok=True)
@@ -164,11 +165,6 @@ class Flow(metaclass=MetaFlow):
         # Do nothing if not implemented
         pass
 
-    def dump_settings(self):
-        effective_settings_json = self.run_path / f'settings.json'
-        logger.info(f'dumping effective settings to {effective_settings_json}')
-        self.dump_json(self.settings, effective_settings_json)
-
     def copy_from_template(self, resource_name, **kwargs) -> str:
         template = self.jinja_env.get_template(resource_name)
         script_path = self.run_path / resource_name
@@ -181,6 +177,9 @@ class Flow(metaclass=MetaFlow):
         with open(script_path, 'w') as f:
             f.write(rendered_content)
         return resource_name
+
+    def add_filter(self, filter_name: str, func) -> None:
+        self.jinja_env.filters[filter_name] = func
 
     def conv_to_relative_path(self, src):
         path = Path(src).resolve(strict=True)
@@ -303,6 +302,8 @@ class Flow(metaclass=MetaFlow):
                 f'Execution of {prog} in {self.run_path} completed with returncode {proc.returncode}')
 
     def parse_report_regex(self, reportfile_path, re_pattern, *other_re_patterns, dotall=True):
+        if isinstance(reportfile_path, str):
+            reportfile_path = self.run_path / reportfile_path
         # TODO fix debug and verbosity levels!
         high_debug = self.settings.verbose
         if not reportfile_path.exists():
@@ -351,10 +352,7 @@ class Flow(metaclass=MetaFlow):
     def print_results(self, results=None):
         if not results:
             results = self.results
-            # init to print_results time:
-            if results.get('runtime_minutes') is None and self.init_time is not None:
-                results['runtime_minutes'] = (
-                    time.monotonic() - self.init_time) / 60
+
         data_width = 32
         name_width = 80 - data_width
         hline = "-"*(name_width + data_width)
@@ -378,25 +376,6 @@ class Flow(metaclass=MetaFlow):
                 else:
                     my_print(f'{k:{name_width}}{str(v):>{data_width}s}')
         my_print(hline + "\n")
-
-    def dump_json(self, data, path: Path):
-        if path.exists():
-            modifiedTime = os.path.getmtime(path)
-            suffix = datetime.fromtimestamp(
-                modifiedTime).strftime("%Y-%m-%d-%H%M%S")
-            backup_path = path.with_suffix(f".backup_{suffix}.json")
-            logger.warning(
-                f"File already exists! Backing-up existing file to {backup_path}")
-            os.rename(path, backup_path)
-
-        with open(path, 'w') as outfile:
-            json.dump(data, outfile, default=lambda x: x.__dict__ if hasattr(
-                x, '__dict__') else str(x), indent=4)
-
-    def dump_results(self):
-        path = self.run_path / f'results.json'
-        self.dump_json(self.results, path)
-        logger.info(f"Results written to {path}")
 
 
 class SimFlow(Flow):
