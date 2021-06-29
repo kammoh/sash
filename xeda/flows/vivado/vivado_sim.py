@@ -3,16 +3,24 @@ import os
 import math
 from types import SimpleNamespace
 from typing import Dict, List, Optional
+from pydantic.main import BaseModel
 
 from pydantic.types import NonNegativeInt, NoneStr
 
 from ...utils import try_convert, unique
-from ..design import DesignSource
+from ..design import Design, DesignSource
 from ..flow import Flow, SimFlow, DebugLevel
 from .vivado_synth import VivadoSynth
 from ..vivado import Vivado
 
 logger = logging.getLogger()
+
+
+class RunConfig(BaseModel):
+    name: NoneStr = None
+    saif: NoneStr = None
+    vcd: NoneStr = None
+    generics: Dict[str, str] = {}
 
 
 class VivadoSim(Vivado, SimFlow):
@@ -27,7 +35,7 @@ class VivadoSim(Vivado, SimFlow):
         analyze_flags: List[str] = ['-relax']
         sim_flags: List[str] = []
         elab_debug: NoneStr = None  # TODO choices: "typical", ...
-        run_configs: Dict[str, str] = {}  # FIXME
+        multirun_configs: List[RunConfig] = []
         sdf: NoneStr = None
         optimization_flags: List[str] = ['-O3']
         debug_traces: bool = False
@@ -42,27 +50,27 @@ class VivadoSim(Vivado, SimFlow):
             f'-mt {"off" if self.settings.debug else self.settings.nthreads}')
 
         elab_debug = self.settings.elab_debug
-        run_configs = self.settings.run_configs
+        multirun_configs = self.settings.multirun_configs
         if not elab_debug and (self.settings.debug or saif or self.vcd):
             elab_debug = "typical"
         if elab_debug:
             elab_flags.append(f'-debug {elab_debug}')
 
-        if not run_configs:
-            run_configs = [dict(saif=saif, generics=generics,
-                                vcd=self.vcd, name='default')]
+        if not multirun_configs:
+            multirun_configs = [RunConfig(saif=saif, generics=generics,
+                                     vcd=self.vcd, name='default')]
             if self.vcd:
                 logger.info(f"Dumping VCD to {self.run_path / self.vcd}")
         else:
-            for idx, rc in enumerate(run_configs):
+            for idx, rc in enumerate(multirun_configs):
                 # merge
-                rc['generics'] = {**generics, **rc['generics']}
-                if not 'saif' in rc:
-                    rc['saif'] = saif
-                if not 'name' in rc:
-                    rc['name'] = f'run_{idx}'
-                if not 'vcd' in rc:
-                    rc['vcd'] = (rc['name'] + '_' +
+                rc.generics = {**generics, **rc.generics}
+                if not rc.saif:
+                    rc.saif = saif
+                if not rc.name:
+                    rc.name = f'run_{idx}'
+                if not rc.vcd:
+                    rc.vcd = (rc.name + '_' +
                                  self.vcd) if self.vcd else None
 
         tb_uut = self.design.tb.uut
@@ -89,7 +97,7 @@ class VivadoSim(Vivado, SimFlow):
                 elab_flags.append(ox)
 
         script_path = self.copy_from_template(f'vivado_sim.tcl',
-                                              run_configs=run_configs,
+                                              multirun_configs=multirun_configs,
                                               initialize_zeros=False,
                                               sim_tops=self.sim_tops,
                                               tb_top=self.tb_top,
@@ -100,18 +108,23 @@ class VivadoSim(Vivado, SimFlow):
 
 
 # class VivadoPostsynthSim(VivadoSim):
-#     """depends on VivadoSynth """
+#     """
+#     Synthesize/implement design and run post-synth/impl simulation on the generated netlist
+#     Depends on VivadoSynth
+#     """
+#     class Settings(VivadoSim.Settings, VivadoSynth.Settings):
+#         pass
 
 #     @classmethod
-#     def prerequisite_flows(cls, flow_settings, design_settings):
+#     def prerequisite_flows(cls, flow_settings: 'VivadoPostsynthSim'.Settings, design: Design):
 #         synth_overrides = dict(constrain_io=True)
-#         period = flow_settings.get('clock_period')
+#         period = flow_settings.clock_period
 #         if period:
-#             synth_overrides['clock_period'] = period
+#             synth_overrides.clock_period = period
 
-#         opt_power = flow_settings.get('optimize_power')
+#         opt_power = flow_settings.optimize_power
 #         if opt_power is not None:
-#             synth_overrides['optimize_power'] = opt_power
+#             synth_overrides.optimize_power = opt_power
 
 #         return {VivadoSynth: (synth_overrides, {})}
 

@@ -1,9 +1,7 @@
-
 # Xeda Vivado Synthtesis flow
 # ©2021 Kamyar Mohajerani and contributors
 
 from collections import abc
-import copy
 import logging
 from typing import Any, Dict, Optional, List, Sequence
 
@@ -382,9 +380,9 @@ class VivadoSynth(Vivado, SynthFlow):
             # TODO better fail analysis for vivado
             if 'wns' in self.results:
                 failed |= (self.results['wns'] < 0)
-            if 'whs' in self.results:    
+            if 'whs' in self.results:
                 failed |= (self.results['whs'] < 0)
-            if '_failing_endpoints' in self.results:    
+            if '_failing_endpoints' in self.results:
                 failed |= self.results['_failing_endpoints'] != 0
 
         self.results['success'] = not failed
