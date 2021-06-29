@@ -1,4 +1,3 @@
-from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from pydantic import BaseModel, Field, Extra
 from typing import List, Optional, Type, Tuple
@@ -76,7 +75,7 @@ class MetaFlow(ABCMeta):
     pass
 
 
-registered_flows: Dict[str, Tuple[str, Type[Flow]]] = {}
+registered_flows: Dict[str, Tuple[str, Type['Flow']]] = {}
 
 
 """ A flow may run one or more tools and is associated with a single set of settings and a single design. """
@@ -118,7 +117,7 @@ class Flow(metaclass=MetaFlow):
             cls_name = m[0] + "." + cls_name
         cls.name = cls_name
 
-    def __init__(self, flow_settings: Flow.Settings, design: Design, run_path: Path, completed_dependencies: List[Flow] = []):
+    def __init__(self, flow_settings: 'Flow.Settings', design: Design, run_path: Path, completed_dependencies: List['Flow'] = []):
         self.settings: Flow.Settings = flow_settings
         self.design: Design = design
         self.run_path = run_path
@@ -400,7 +399,7 @@ class SimFlow(Flow):
         vcd: NoneStr = None
         stop_time: NoneStr = None
 
-    def __init__(self, flow_settings: SimFlow.Settings, design: Design, run_path: Path, completed_dependencies: List[Flow] = []):
+    def __init__(self, flow_settings: 'SimFlow.Settings', design: Design, run_path: Path, completed_dependencies: List[Flow] = []):
         self.settings: SimFlow.Settings = flow_settings
         super().__init__(flow_settings, design, run_path, completed_dependencies)
 
