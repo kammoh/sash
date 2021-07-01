@@ -307,21 +307,15 @@ def sanitize_toml(obj):
 
 
 def load_xedaproject(project_file: Path):
-    try:
-        with open(project_file) as f:
-            ext = project_file.suffix.lower()
-            if ext == '.json':
-                return json.load(f)
-            elif ext == '.toml':
-                return sanitize_toml(toml.load(f))
-            else:
-                exit(
-                    f"xedaproject: {project_file} has unknown extension {ext}. Currently supported formats are TOML (.toml) and JSON (.json)")
-    except FileNotFoundError:
-        exit(
-            f'Cannot open project file: {project_file}. Please run from the project directory with xedaproject.toml or specify the correct path using the --xedaproject flag')
-    except IsADirectoryError:
-        exit(f'The specified xedaproject is not a regular file.')
+    print(f"try opening {project_file}")
+    with open(project_file) as f:
+        ext = project_file.suffix.lower()
+        if ext == '.json':
+            return json.load(f)
+        elif ext == '.toml':
+            return sanitize_toml(toml.load(f))
+        else:
+            exit(f"xedaproject: {project_file} has unknown extension {ext}. Currently supported formats are TOML (.toml) and JSON (.json)")
 
 
 class XedaApp:
@@ -334,8 +328,14 @@ class XedaApp:
         runner_cls = parsed_args.flow_runner
 
         toml_path = Path(parsed_args.xedaproject)
-        xeda_project = load_xedaproject(toml_path)
-
+        try:
+            xeda_project = load_xedaproject(toml_path)
+        except FileNotFoundError as e:
+            try:
+                xeda_project = load_xedaproject(toml_path.parent / (toml_path.stem + ".json"))
+            except :
+                exit(f'Cannot open project file: {toml_path}. Please run from the project directory with xedaproject.toml or specify the correct path using the --xedaproject flag')                
         runner: FlowRunner = runner_cls(parsed_args, xeda_project)
-
         runner.launch(parsed_args.flow, parsed_args.force_rerun)
+
+

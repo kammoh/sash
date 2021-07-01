@@ -220,7 +220,7 @@ xeda_strategies: Dict[str, Dict[str, Any]] = {
 }
 
 
-StepsValType = Optional[Dict[str, Union[NoneStr, int, bool, float]]]
+StepsValType = Optional[Dict[str, Any]]
 
 
 def get_steps(run: str) -> List[str]:

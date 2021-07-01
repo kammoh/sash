@@ -65,13 +65,25 @@ set_property strategy {{settings.impl.strategy}} [get_runs impl_1]
 
 {% for step,options in settings.synth.steps.items() -%}
 {% for name,value in options.items() -%}
+{% if value is mapping %}
+{% for k,v in value.items() %}
+set_property STEPS.{{step}}.{{name}}.{{k}} {{v}} [get_runs synth_1]
+{% endfor -%}
+{% else %}
 set_property STEPS.{{step}}.{{name}} {{value}} [get_runs synth_1]
+{% endif %}
 {% endfor -%}
 {% endfor -%}
 
 {% for step,options in settings.impl.steps.items() -%}
 {% for name,value in options.items() -%}
+{% if value is mapping %}
+{% for k,v in value.items() %}
+set_property STEPS.{{step}}.{{name}}.{{k}} {{v}} [get_runs impl_1]
+{% endfor -%}
+{% else %}
 set_property STEPS.{{step}}.{{name}} {{value}} [get_runs impl_1]
+{% endif %}
 {% endfor -%}
 {% endfor -%}
 
