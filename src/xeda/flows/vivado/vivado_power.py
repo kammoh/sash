@@ -29,8 +29,10 @@ class VivadoPower(Vivado):
 
     @classmethod
     def prerequisite_flows(cls, flow_settings, _design_settings):
-        synth_overrides = dict(strategy=flow_settings.get('strategy', 'AreaPower')) ## FIXME!!! For reasons still unknown, not all strategies lead to correct post-impl simulation
-        postsynthsim_overrides = dict(constrain_io=True, elab_debug='typical',
+        # FIXME!!! For reasons still unknown, not all strategies lead to correct post-impl simulation
+        synth_overrides = dict(
+            strategy=flow_settings.get('strategy', 'AreaPower'))
+        postsynthsim_overrides = dict(input_delay=0.0, output_delay=0.0, elab_debug='typical',
                                       saif=cls.default_saif_file,  dependencies=dict(vivado_synth=synth_overrides))
 
         period = flow_settings.get('clock_period')

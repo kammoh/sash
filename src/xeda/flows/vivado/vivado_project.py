@@ -6,9 +6,10 @@ from ..flow import SynthFlow
 logger = logging.getLogger()
 
 
-class VivadoPrjSynth(VivadoSynth, SynthFlow):
+class VivadoPrjSynth(VivadoSynth):
 
     class Settings(VivadoSynth.BaseSettings):
+        """Settings for Vivado synthesis in project mode settings"""
         # fail_critical_warning = False
         # optimize_power = False
         # optimize_power_postplace = False

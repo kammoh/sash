@@ -1,13 +1,11 @@
 from abc import ABCMeta, abstractmethod
 from pydantic import BaseModel, Field, Extra
-from typing import List, Optional, Type, Tuple
-from datetime import datetime
-import json
+from pydantic.types import NoneStr
+from typing import List, Mapping, Optional, Type, Tuple
 import os
 import re
 from pathlib import Path
 import subprocess
-import time
 from jinja2 import Environment, PackageLoader, StrictUndefined
 import logging
 from jinja2.loaders import ChoiceLoader
@@ -17,7 +15,7 @@ import colored
 from typing import Dict, List
 import inspect
 import multiprocessing
-from pydantic.types import NoneStr
+from typing_extensions import Annotated
 
 from .design import Design
 from ..utils import camelcase_to_snakecase, try_convert
@@ -94,15 +92,16 @@ class Flow(metaclass=MetaFlow):
         """Settings that can affect flow's behavior"""
         reports_subdir_name: str = 'reports'
         timeout_seconds: int = 3600 * 2
-        """max number of threads/cpus"""
-        nthreads: int = Field(default_factory=multiprocessing.cpu_count)
+        nthreads: int = Field(default_factory=multiprocessing.cpu_count,
+                              description="max number of threads/cpus")
         quiet: bool = False
         verbose: bool = False
         debug: bool = False
         no_console: bool = False
         reports_dir: str = 'reports'
         lib_paths: List[str] = []
-        defines: Dict[str, str] = Field({}, alias='generics')
+        defines: Dict[str, str] = Field(default=dict())
+        generics: Dict[str, str] = Field(default=dict())
 
     @classmethod
     def prerequisite_flows(cls, flow_settings, design_settings):
@@ -345,8 +344,9 @@ class Flow(metaclass=MetaFlow):
                     matched = match_pattern(pat)
 
                 if not matched:
-                    self.fatal(
+                    logger.critical()(
                         f"Error parsing report file: {rpt_file.name}\n Pattern not matched: {pat}\n")
+                    return False
         return True
 
     def print_results(self, results=None):
@@ -426,11 +426,12 @@ class SimFlow(Flow):
 
 
 class FPGA(BaseModel):
-    part: NoneStr = None
+    """FPGA target device"""
+    part: NoneStr = Field(None, description="full device part identifier")
     vendor: NoneStr = None
     device: NoneStr = None
     family: NoneStr = None
-    speed: NoneStr = None
+    speed: NoneStr = Field(None, description="speed-grade")
     package: NoneStr = None
 
     def __init__(self, **data) -> None:
@@ -465,10 +466,21 @@ class FPGA(BaseModel):
 
 class SynthFlow(Flow):
     class Settings(Flow.Settings):
-        """target clock period in nano-seconds"""
-        clock_period: float
-        fpga: Optional[FPGA]
-        tech: Optional[str]
+        """base Synthesis flow settings"""
+        clock_period: Annotated[float, Field(
+            description="target clock period in nanoseconds")]
+
+
+class FpgaSynthFlow(SynthFlow):
+    class Settings(SynthFlow.Settings):
+        """base FPGA Synthesis flow settings"""
+        fpga: FPGA
+
+
+class AsicSynthFlow(SynthFlow):
+    class Settings(SynthFlow.Settings):
+        """base ASIC Synthesis flow settings"""
+        tech: str
 
 
 class DseFlow(Flow):

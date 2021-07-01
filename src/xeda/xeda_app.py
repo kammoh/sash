@@ -13,11 +13,15 @@ import logging
 import toml
 import json
 import shtab
+from argparse_formatter import FlexiFormatter
 from .flows.flow import Flow, SimFlow, SynthFlow
 from .utils import camelcase_to_snakecase, load_class
 from .debug import DebugLevel
 from .flow_runner import FlowRunner
 from .flow_runner.default_runner import DefaultRunner
+from .flow_runner import FlowGen
+
+from pprint import pprint
 
 from ._version import get_versions
 __version__ = get_versions()['version']
@@ -27,10 +31,56 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 
+class FlowSettingsAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        try:
+            print(f"flow={namespace.flow}")
+            flow_gen = FlowGen({})
+            schema = flow_gen.get_settings_schema(namespace.flow, "xeda.flows")
+            self.print_flow_settings(schema)
+        finally:
+            exit(0)
+
+    @staticmethod
+    def print_flow_settings(schema):
+        def get_type(field):
+            typ = field.get("type")
+            type_def = None
+            ref = field.get("$ref")
+            if typ is None and ref:
+                typ = ref.split("/")[-1]
+                type_def = schema.get('definitions', {}).get(typ)
+            additional = field.get("additionalProperties")
+            if typ == 'object' and additional:
+                typ = f"Dict[string, {additional.get('type')}]"
+            allof = field.get("allOf")
+            if typ is None and allof:
+                typs = [get_type(t) for t in allof]
+                typ = '+'.join([t[0] for t in typs])
+                type_def = typs[0][1]
+            return typ, type_def
+
+        for name, field in schema.get('properties', {}).items():
+            required = name in schema.get('required', [])
+            desc = field.get("description", "")
+            typ, type_def = get_type(field)
+            default = field.get("default")
+            req_or_def = f"default: {default}" if default is not None else "required" if required else ""
+            print(f"{name} [{typ}] ({req_or_def}): {desc}")
+            if type_def:
+                td_desc = type_def.get('description')
+                td_props = type_def.get('properties')
+                if td_desc:
+                    print(td_desc)
+                if td_props:
+                    pprint(td_props)
+
+
 class ListDesignsAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         try:
-            xp = load_xedaproject(namespace.xedaproject)
+            toml_path = Path(namespace.xedaproject)
+            xp = load_xedaproject(toml_path)
             print(f'Listing designs in `{namespace.xedaproject}`:')
             designs = xp.get('design')
             if designs:
@@ -46,6 +96,8 @@ class ListDesignsAction(argparse.Action):
                     else:
                         desc = ""
                     print(f"{' '*4}{dn:<10} {desc:.80}")
+        except Exception as e:
+            raise e from None
         finally:
             exit(0)
 
@@ -61,8 +113,7 @@ def get_main_argparser():
     parser = argparse.ArgumentParser(
         prog=__package__,
         description=f'{__package__}: Cross-EDA abstraction and automation. Version: {__version__}',
-        formatter_class=lambda prog: argparse.HelpFormatter(
-            prog, max_help_position=35),
+        formatter_class=FlexiFormatter,
     )
 
     parser.add_argument(
@@ -70,7 +121,10 @@ def get_main_argparser():
         type=int,
         metavar='DEBUG_LEVEL',
         default=DebugLevel.NONE,
-        help=f'Set debug level. Values of DEBUG_LEVEL correspond to: {list(DebugLevel)}'
+        help=f"""
+            Set debug level. DEBUG_LEVEL corresponds to: 
+            {', '.join([str(l) for l in DebugLevel])}
+        """
     )
     parser.add_argument(
         '--verbose',
@@ -82,11 +136,11 @@ def get_main_argparser():
         action='store_true',
         help="Be as quiet as possible. Never print out output from command executions"
     )
-    parser.add_argument(
-        '--force-run-dir',
-        help='USE ONLY FOR DEBUG PURPOSES.',
-        # default=None
-    )
+    # parser.add_argument(
+    #     '--force-run-dir',
+    #     help='USE ONLY FOR DEBUG PURPOSES.',
+    #     # default=None
+    # )
     parser.add_argument(
         '--xeda-run-dir',
         help='Directory where the flows are executed and intermediate and result files reside.',
@@ -99,14 +153,20 @@ def get_main_argparser():
         help='Force re-run of flow and all dependencies, even if they are already up-to-date',
     )
     parser.add_argument(
-        '--use-stale',
-        action='store_true',
-        default=False,
-        help="Don'r run the flow if stale results already exist.",
+        '--max-cpus',
+        default=max(1, multiprocessing.cpu_count()),
+        type=int,
+        help="""
+        Maximum number of threads or CPU cores to use.
+        """
     )
     parser.add_argument(
-        '--max-cpus',
-        default=max(1, multiprocessing.cpu_count()), type=int,
+        '--help-settings',
+        nargs=0,
+        action=FlowSettingsAction,
+        help="""
+        List flow settings information
+        """
     )
 
     registered_flows = [camelcase_to_snakecase(n) for n, _ in flow_classes]
@@ -135,14 +195,20 @@ def get_main_argparser():
             #     sys.exit(f'Flow {flow_name} not found')
             setattr(args, self.dest, flow_name)
 
-    parser.add_argument('flow', metavar='[RUNNER_NAME:]FLOW_NAME', action=CommandAction,
-                        help=(f'Flow name optionally prepended by flow-runner.'
-                              'If runner is not specified the default runner is used.\n'
-                              f'Available flows are: {registered_flows}\n'
-                              f'Available runners are: {[camelcase_to_snakecase(n) for n, _ in runner_classes]}'
-                              )
-                        )
-    # redundant, kept for compatibility
+    parser.add_argument(
+        'flow',
+        metavar='[RUNNER_NAME:]FLOW_NAME',
+        action=CommandAction,
+        help=f"""Flow name optionally prepended by flow-runner.
+
+If runner is not specified 'default' runner is used.
+
+Available flows:
+    {', '.join(registered_flows)}
+Available runners:
+    {', '.join([camelcase_to_snakecase(n) for n, _ in runner_classes])}
+"""
+    )
     parser.add_argument(
         '--design',
         nargs='?',
@@ -164,21 +230,33 @@ def get_main_argparser():
         default='xedaproject.toml',
         help='Path to Xeda project file. By default will use xedaproject.toml in the current directory.'
     )
-    # parser.add_argument('--override-settings', nargs='+',
-    #                     help=('Override setting value. Use <hierarchy>.key=value format'
-    #                           'example: --override-settings flows.vivado_run.stop_time=100us'
-    #                           )
-    #                     )
-    parser.add_argument('--flow-settings', nargs='+',
-                        help=(
-                            'Override setting values for the main flow. Use key=value format.'
-                            'example: xeda vivado_sim --flow-settings stop_time=100us')
-                        )
+
+    parser.add_argument(
+        '--flow-settings',
+        action="extend",
+        nargs="+",
+        type=str,
+        help="""
+            Override setting values for the main flow. Use <key hierarchy>=<value> format.
+             examples: 
+                - xeda vivado_sim --flow-settings stop_time=100us
+                - xeda vivado_synth --flow-settings impl.strategy=Debug --flow-settings clock_period=2.345
+        """
+    )
     parser.add_argument(
         '--version',  action='version', version=f'%(prog)s {__version__}', help='Print version information and exit',
     )
 
-    shtab.add_argument_to(parser, ["--print-completion"])
+    shtab.add_argument_to(
+        parser,
+        option_string="--completion",
+        help="""
+        Print zsh/bash shell completion to stdout
+        example usage:
+            - xeda --completion zsh > ~/.oh-my-zsh/functions/_xeda
+            - xeda --completion bash > ~/.local/share/bash-completion/xeda
+        """
+    )
     return parser
 
 

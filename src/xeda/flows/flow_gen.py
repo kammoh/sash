@@ -1,13 +1,15 @@
 from .flow import Flow, Design, registered_flows
-from ..utils import snakecase_to_camelcase, dump_json
+from ..utils import dict_merge, snakecase_to_camelcase, dump_json, try_convert
 from pathvalidate import sanitize_filename
 import logging
 import time
 from datetime import datetime
-from typing import Mapping, Optional, Type, Dict, List, Any
+from typing import Mapping, Type, Dict, List, Any
 import importlib
 import hashlib
 from pathlib import Path
+import re
+
 from .._version import get_versions
 __version__ = get_versions()['version']
 del get_versions
@@ -21,18 +23,16 @@ class FlowGen:
     def merge_overrides(overrides, settings):
         if overrides:
             if isinstance(overrides, str):
-                overrides = [overrides]
-            if len(overrides) == 1:
-                overrides = re.split(r'\s*,\s*', overrides[0])
+                overrides = re.split(r'\s*,\s*', overrides)
             for override in overrides:
                 key, val = override.split('=')
                 hier = key.split('.')
                 patch_dict = dict()
+                tmp = patch_dict
                 for field in hier[:-1]:
-                    new_dict = dict()
-                    patch_dict[field] = new_dict
-                    patch_dict = new_dict
-                patch_dict[hier[-1]] = try_convert(val, convert_lists=True)
+                    tmp[field] = dict()
+                    tmp = tmp[field]
+                tmp[hier[-1]] = try_convert(val, convert_lists=True)
                 settings = dict_merge(settings, patch_dict, True)
         return settings
 
@@ -58,7 +58,8 @@ class FlowGen:
 
         return get_digest(bytes(repr(sorted_dict_str(data)), 'UTF-8'))
 
-    def generate(self, flow_name: str, module_name: str, design: Design, xeda_run_dir: Path, completed_dependencies: List[Flow], override_settings: Mapping[str, Any], verbose: bool = False, package: str = __package__) -> Flow:
+    @staticmethod
+    def get_flow_class(flow_name: str, module_name: str, package: str) -> Type[Flow]:
         (mod, flow_class) = registered_flows.get(flow_name, (None, None))
         if flow_class is None:
             logger.warn(
@@ -78,12 +79,22 @@ class FlowGen:
                     f"Unable to find class {flow_class_name} in {module}")
                 raise e from None
         assert flow_class is not None and issubclass(flow_class, Flow)
+        return flow_class
+
+    def get_settings_schema(self, flow_name: str, module_name: str, package: str = __package__):
+        flow_class = self.get_flow_class(flow_name, module_name, package)
+        return flow_class.Settings.schema(by_alias=False)
+
+    def generate(self, flow_name: str, module_name: str, design: Design, xeda_run_dir: Path, completed_dependencies: List[Flow], override_settings: Mapping[str, Any], verbose: bool = False, package: str = __package__) -> Flow:
+        flow_class = self.get_flow_class(flow_name, module_name, package)
+
         flow_settings_dict = self.all_flows_settings.get(flow_name, {})
         if override_settings:
-            self.merge_overrides(override_settings, flow_settings_dict)
+            flow_settings_dict = self.merge_overrides(
+                override_settings, flow_settings_dict)
         flow_settings = flow_class.Settings(**flow_settings_dict)
         if verbose:
-            flow_settings.verbose = True # force verbose
+            flow_settings.verbose = True  # force verbose
         all_settings = dict(
             flow_name=flow_name, flow_settings=flow_settings,
             design=design, xeda_version=__version__
